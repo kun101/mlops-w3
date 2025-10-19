@@ -14,43 +14,51 @@ jobs:
   test-and-evaluate:
     runs-on: ubuntu-latest
     steps:
+      # Step 1: Checkout repository
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
+      # Step 2: Set up Python
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
+      # Step 3: Install dependencies
       - name: Install dependencies
         run: |
           python -m pip install --upgrade "pip<24.1"
           pip install dvc dvc-gs pytest dvc-data
 
-      - name: Configure Git for DVC
+      # Step 4: Configure Git for DVC
+      - name: Configure Git
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Authenticate with GCP
-        run: |
-          echo "${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}" > gcp-key.json
+      # Step 5: Authenticate with GCP and pull DVC data
+      - name: Authenticate with GCP and pull data
         env:
-          GOOGLE_APPLICATION_CREDENTIALS: ${{ github.workspace }}/gcp-key.json
-
-      - name: Configure DVC Remote
+          GCP_SA_KEY: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
         run: |
+          # Create a temporary file for the service account key
+          tmpfile=$(mktemp)
+          echo "$GCP_SA_KEY" > $tmpfile
+          export GOOGLE_APPLICATION_CREDENTIALS=$tmpfile
+
+          # Configure DVC remote
           dvc remote add -d gcs-remote gs://mlops-sixth-sequencer-473212-e7-week1/dvc-storage
           dvc remote default gcs-remote
-        env:
-          GOOGLE_APPLICATION_CREDENTIALS: ${{ github.workspace }}/gcp-key.json
 
-      - name: Pull data and model with DVC
-        run: dvc pull
-        env:
-          GOOGLE_APPLICATION_CREDENTIALS: ${{ github.workspace }}/gcp-key.json
+          # Pull data and models
+          dvc pull
 
+          # Clean up temporary key
+          rm $tmpfile
+
+      # Step 6: Run unit tests
       - name: Run unit tests
-        run: pytest test_pipeline.py
+        run: |
+          pytest test_pipeline.py
