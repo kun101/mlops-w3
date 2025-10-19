@@ -37,18 +37,20 @@ jobs:
       - name: Authenticate with GCP
         run: |
           echo "${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}" > gcp-key.json
-          export GOOGLE_APPLICATION_CREDENTIALS=$(pwd)/gcp-key.json
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ github.workspace }}/gcp-key.json
 
       - name: Configure DVC Remote
         run: |
           dvc remote add -d gcs-remote gs://mlops-sixth-sequencer-473212-e7-week1/dvc-storage
           dvc remote default gcs-remote
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ github.workspace }}/gcp-key.json
 
       - name: Pull data and model with DVC
-        run: |
-          export GOOGLE_APPLICATION_CREDENTIALS=$(pwd)/gcp-key.json
-          dvc pull
+        run: dvc pull
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ github.workspace }}/gcp-key.json
 
       - name: Run unit tests
-        run: |
-          pytest test_pipeline.py
+        run: pytest test_pipeline.py
