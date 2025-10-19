@@ -1,0 +1,4 @@
+[core]
+    remote = gcs-remote
+['remote "gcs-remote"']
+    url = gs://mlops-sixth-sequencer-473212-e7-week1/dvc-storage
