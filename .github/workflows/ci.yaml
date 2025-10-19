@@ -30,7 +30,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade "pip<24.1"
-          pip install dvc dvc-gs pytest dvc-data
+          pip install dvc dvc-gs dvc-data pytest pandas joblib scikit-learn
 
       # Step 4: Configure Git for DVC
       - name: Configure Git
