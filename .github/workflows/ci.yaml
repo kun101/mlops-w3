@@ -13,6 +13,8 @@ on:
 jobs:
   test-and-evaluate:
     runs-on: ubuntu-latest
+    env:
+        DVC_REV: v1.0
     steps:
       # Step 1: Checkout repository
       - name: Checkout code
