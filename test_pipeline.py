@@ -9,7 +9,7 @@ from dvc.api import DVCFileSystem # Import DVCFileSystem
 DVC_REPO_URL = "https://github.com/kun101/mlops-w3.git" # Your GitHub repo URL
 DATA_PATH_IN_DVC = "data/iris.csv" # Path to data folder in your DVC config
 MODEL_PATH_IN_DVC = "artifacts/model.joblib" # Path to model in your DVC config
-DVC_TAG_TO_TEST = "v1.0" # Which DVC tag to test against
+DVC_TAG_TO_TEST = os.getenv("DVC_REV", "v1.0")
 
 # --- Data Loading Function (using DVCFileSystem) ---
 def load_dvc_data(path_in_dvc, tag):
