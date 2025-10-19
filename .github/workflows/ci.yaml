@@ -55,6 +55,7 @@ jobs:
           dvc remote add -d gcs-remote gs://mlops-sixth-sequencer-473212-e7-week1/dvc-storage
           dvc remote default gcs-remote
 
+          dvc checkout $DVC_REV
           # Pull data and models
           dvc pull -r gcs-remote
 
