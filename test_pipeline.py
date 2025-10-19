@@ -15,13 +15,25 @@ DVC_TAG_TO_TEST = os.getenv("DVC_REV", "v1.0")
 # --- Data Loading Function (using DVCFileSystem) ---
 def load_dvc_data(path_in_dvc, tag):
     fs = DVCFileSystem(DVC_REPO_URL, rev=tag)
-    with fs.open(path_in_dvc, 'rb') as f:
-        if path_in_dvc.endswith('.csv'):
-            return pd.read_csv(f)
-        elif path_in_dvc.endswith('.joblib'):
-            return joblib.load(f)
-        else:
-            raise ValueError("Unsupported file type for DVC loading.")
+    if fs.isdir(path_in_dvc):  # <- check if path is a directory
+        # list all files
+        files = fs.ls(path_in_dvc)
+        data_frames = []
+        for f in files:
+            if f.endswith(".csv"):
+                with fs.open(f, "rb") as file_obj:
+                    df = pd.read_csv(file_obj)
+                    data_frames.append(df)
+        # combine CSVs if multiple
+        return pd.concat(data_frames, ignore_index=True)
+    else:
+        with fs.open(path_in_dvc, "rb") as f:
+            if path_in_dvc.endswith(".csv"):
+                return pd.read_csv(f)
+            elif path_in_dvc.endswith(".joblib"):
+                return joblib.load(f)
+            else:
+                raise ValueError("Unsupported file type for DVC loading.")
 
 # --- Tests ---
 @pytest.fixture(scope="module")
