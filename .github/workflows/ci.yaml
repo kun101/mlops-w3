@@ -1,0 +1,79 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+  pull_request:
+    branches:
+      - main
+      - dev
+
+jobs:
+  test-and-evaluate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          # Needed for DVC to fetch from specific revisions/tags if your repo is private
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10' # Ensure this matches your Workbench Python version
+
+      - name: Install dependencies
+        run: |
+          pip install dvc[gcs] pytest dvc-data cml
+          # If your training script has its own requirements, list them here
+          # pip install pandas scikit-learn joblib
+
+      - name: Configure Git for DVC
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Configure DVC Remote
+        run: |
+          # Set DVC remote to your GCS bucket
+          dvc remote add -d gcs-remote gs://mlops-sixth-sequencer-473212-e7-week1/dvc-storage
+          dvc remote default gcs-remote
+        env:
+          # Ensure these are configured as GitHub Secrets!
+          GCS_BUCKET_NAME: ${{ secrets.GCS_BUCKET_NAME }}
+          GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
+
+      - name: Pull data and model with DVC
+        run: |
+          dvc pull
+        env:
+          # If DVC remote is private and requires auth. If using GCS, usually handled by GOOGLE_APPLICATION_CREDENTIALS_JSON
+          # DVC_GCP_CREDENTIALS_JSON: ${{ secrets.GCP_SA_KEY }} # Example for private DVC GCS access
+
+      - name: Run unit tests
+        id: pytest_output
+        run: |
+          pytest test_pipeline.py > pytest_report.txt 2>&1
+          # Store the exit code for CML
+          echo "exit_code=$?" >> $GITHUB_OUTPUT
+
+      - name: Create CML Report
+        if: always() # Always run to report status, even if tests fail
+        env:
+          REPO_TOKEN: ${{ secrets.REPO_TOKEN }} # Needed for CML to comment on PRs
+        run: |
+          echo "## CI Test Report" > cml_report.md
+          echo "\`\`\`" >> cml_report.md
+          cat pytest_report.txt >> cml_report.md
+          echo "\`\`\`" >> cml_report.md
+
+          if [ "${{ steps.pytest_output.outputs.exit_code }}" == "0" ]; then
+            echo "### ✅ All tests passed!" >> cml_report.md
+          else
+            echo "### ❌ Tests failed. See details above." >> cml_report.md
+          fi
+
+          cml comment create cml_report.md
