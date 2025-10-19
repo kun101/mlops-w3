@@ -56,7 +56,7 @@ jobs:
           dvc remote default gcs-remote
 
           # Pull data and models
-          dvc pull
+          dvc pull -r gcs-remote
 
           # Clean up temporary key
           rm $tmpfile
