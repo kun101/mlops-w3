@@ -27,7 +27,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install dvc[gcs] pytest dvc-data cml
+          pip install dvc dvc-gs pytest dvc-data cml
           # If your training script has its own requirements, list them here
           # pip install pandas scikit-learn joblib
 
