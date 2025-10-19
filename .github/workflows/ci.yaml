@@ -49,7 +49,6 @@ jobs:
       - name: Pull data and model with DVC
         run: |
           dvc pull
-        env:
           # If DVC remote is private and requires auth. If using GCS, usually handled by GOOGLE_APPLICATION_CREDENTIALS_JSON
           # DVC_GCP_CREDENTIALS_JSON: ${{ secrets.GCP_SA_KEY }} # Example for private DVC GCS access
 
