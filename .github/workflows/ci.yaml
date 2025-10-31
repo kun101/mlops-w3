@@ -2,19 +2,16 @@ name: CI Pipeline
 
 on:
   push:
-    branches:
-      - main
-      - dev
+    branches: [main, dev]
   pull_request:
-    branches:
-      - main
-      - dev
+    branches: [main, dev]
 
 jobs:
   test-and-evaluate:
     runs-on: ubuntu-latest
     env:
-        DVC_REV: v1.0
+      DVC_REV: v1.0
+
     steps:
       # Step 1: Checkout repository
       - name: Checkout code
@@ -27,13 +24,13 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: "3.10"
 
       # Step 3: Install dependencies
       - name: Install dependencies
         run: |
           python -m pip install --upgrade "pip<24.1"
-          pip install dvc dvc-gs dvc-data pytest pandas joblib scikit-learn
+          pip install dvc dvc-gs pytest pandas joblib scikit-learn
 
       # Step 4: Configure Git for DVC
       - name: Configure Git
@@ -41,28 +38,34 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      # Step 5: Authenticate with GCP and pull DVC data
-      - name: Authenticate with GCP and pull data
+      # Step 5: Checkout DVC revision first, then authenticate and pull
+      - name: Checkout and pull data with DVC
         env:
           GCP_SA_KEY: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
         run: |
+          # Checkout the DVC revision before configuring the remote
+          git checkout $DVC_REV
+
           # Create a temporary file for the service account key
           tmpfile=$(mktemp)
           echo "$GCP_SA_KEY" > $tmpfile
           export GOOGLE_APPLICATION_CREDENTIALS=$tmpfile
 
-          # Configure DVC remote
+          # Remove any old remotes and configure a new one
+          dvc remote list || true
+          dvc remote remove gcs-remote || true
           dvc remote add -d gcs-remote gs://mlops-sixth-sequencer-473212-e7-week1/dvc-storage -f
-          dvc remote default gcs-remote
 
-          git checkout $DVC_REV
-          # Pull data and models
-          dvc pull -r gcs-remote
+          # Verify the remote exists
+          echo "DVC remotes after adding:"
+          dvc remote list
+
+          # Pull data using the configured remote
+          dvc pull -r gcs-remote -v
 
           # Clean up temporary key
           rm $tmpfile
 
       # Step 6: Run unit tests
       - name: Run unit tests
-        run: |
-          pytest test_pipeline.py
+        run: pytest -s test_pipeline.py
