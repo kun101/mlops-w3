@@ -52,7 +52,7 @@ jobs:
           export GOOGLE_APPLICATION_CREDENTIALS=$tmpfile
 
           # Configure DVC remote
-          dvc remote add -d gcs-remote gs://mlops-sixth-sequencer-473212-e7-week1/dvc-storage
+          dvc remote add -d gcs-remote gs://mlops-sixth-sequencer-473212-e7-week1/dvc-storage -f
           dvc remote default gcs-remote
 
           git checkout $DVC_REV
