@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: iris-api-sa # Kubernetes Service Account
+  annotations:
+    # Link KSA to the GCP SA (GSA)
+    iam.gke.io/gcp-service-account: github-cd-sa@sixth-sequencer-473212-e7.iam.gserviceaccount.com
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: iris-api-deployment
+spec:
+  replicas: 2 # Run 2 instances
+  selector:
+    matchLabels:
+      app: iris-api
+  template:
+    metadata:
+      labels:
+        app: iris-api
+    spec:
+      serviceAccountName: iris-api-sa # Use the KSA defined above
+      containers:
+      - name: iris-api-container
+        image: __IMAGE_PLACEHOLDER__ # GitHub Actions will replace this
+        ports:
+        - containerPort: 8080
+        env:
+        - name: MLFLOW_TRACKING_URI
+          value: "__MLFLOW_URI_PLACEHOLDER__" # GitHub Actions will replace this
