@@ -11,7 +11,7 @@ env:
   GAR_LOCATION: us-central1 # Update if you chose a different region
   IMAGE_NAME: iris-api
   GKE_CLUSTER_NAME: iris-cluster # The name of your GKE cluster
-  GKE_ZONE: us-central1-c # Update with your cluster's zone
+  GKE_ZONE: us-central1 # Update with your cluster's zone
   MLFLOW_URI_FROM_SECRET: ${{ secrets.MLFLOW_TRACKING_URI }}
 
 jobs:
