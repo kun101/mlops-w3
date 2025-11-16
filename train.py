@@ -8,11 +8,12 @@ import mlflow.sklearn
 import dvc.api
 import os
 import subprocess
+import shutil
 
 # --- 1. SET UP ---
 
 os.environ["MLFLOW_TRACKING_INSECURE_TLS"] = "true"
-# (REQUIRED) SET THIS TO YOUR 8080 PROXY URL
+# (REQUIRED) SET THIS TO YOUR 3002 PROXY URL
 MLFLOW_TRACKING_URI = "http://127.0.0.1:3002"
 
 # Path to the data in your DVC remote (GCS)
@@ -21,6 +22,9 @@ path = 'data/iris.csv'
 repo = 'https://github.com/kun101/mlops-w3' # Your GitHub repo
 version = 'v1.0' # The DVC tag for your data
 
+if os.path.exists("mlops-w3"):
+    shutil.rmtree("mlops-w3")
+    
 if not os.path.exists("mlops-w3"):
     subprocess.run(["git", "clone", repo], check=True)
 
