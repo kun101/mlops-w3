@@ -14,7 +14,9 @@ jobs:
       DVC_REV: v1.0
 
     steps:
-
+      # ----------------------------------------------------------
+      # Step 1: Checkout code
+      # ----------------------------------------------------------
       - name: Checkout code
         uses: actions/checkout@v4
         with:
@@ -22,7 +24,7 @@ jobs:
           fetch-tags: true
 
       # ----------------------------------------------------------
-      # Authenticate FIRST before touching DVC or MLflow
+      # Step 2: Authenticate BEFORE DVC and MLflow
       # ----------------------------------------------------------
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
@@ -32,27 +34,36 @@ jobs:
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
 
-      - name: Export GOOGLE_APPLICATION_CREDENTIALS for MLflow + DVC
+      # Safe write of JSON key so gcsfs + mlflow can read it
+      - name: Export GOOGLE_APPLICATION_CREDENTIALS for MLflow and DVC
         run: |
-          echo "${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}" > gcp_key.json
+          printf '%s' "${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}" > gcp_key.json
           echo "GOOGLE_APPLICATION_CREDENTIALS=$PWD/gcp_key.json" >> $GITHUB_ENV
 
       # ----------------------------------------------------------
-      # Install Python deps including DVC and mlflow
+      # Step 3: Install dependencies (DVC + MLflow)
       # ----------------------------------------------------------
       - name: Install dependencies
         run: |
           python -m pip install --upgrade "pip<24.1"
-          pip install dvc dvc-gs mlflow google-cloud-storage pytest pandas joblib scikit-learn
+          pip install \
+            dvc \
+            dvc-gs \
+            mlflow \
+            google-cloud-storage \
+            pytest \
+            pandas \
+            joblib \
+            scikit-learn
 
       # ----------------------------------------------------------
-      # NOW checkout the DVC revision
+      # Step 4: Checkout DVC revision AFTER auth
       # ----------------------------------------------------------
       - name: Checkout DVC revision
         run: git checkout $DVC_REV
 
       # ----------------------------------------------------------
-      # Now DVC can authenticate properly
+      # Step 5: DVC pull now works because credentials are loaded
       # ----------------------------------------------------------
       - name: Pull data with DVC
         run: |
@@ -60,7 +71,7 @@ jobs:
           dvc pull -v
 
       # ----------------------------------------------------------
-      # Finally run your tests
+      # Step 6: Run your tests
       # ----------------------------------------------------------
       - name: Run unit tests
         run: pytest -s test_pipeline.py
