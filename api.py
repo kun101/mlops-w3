@@ -3,7 +3,7 @@ import pandas as pd
 import mlflow
 from flask import Flask, request, jsonify
 
-# --- CONFIGURATION ---
+# --- CONFIGURATION
 # Load MLFLOW_TRACKING_URI from environment variable
 # This will be set in your GKE deployment
 tracking_uri = os.environ.get("MLFLOW_TRACKING_URI")
