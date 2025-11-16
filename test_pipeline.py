@@ -17,7 +17,7 @@ MODEL_NAME = "iris-classifier"
 MODEL_STAGE = "production"
 
 # DVC path for the evaluation data
-DATA_PATH = 'data/v2/iris.csv'
+DATA_PATH = 'data/iris.csv'
 DVC_REPO_URL = 'https://github.com/kun101/mlops-w3'
 DVC_TAG = 'v1.0' # Use the same data version you trained on
 
@@ -49,7 +49,7 @@ def data():
     print("Loading data from DVC...")
     try:
         data_url = dvc.api.get_url(
-            path="data/raw/iris.csv",
+            path="data/iris.csv",
             repo=repo_path,
             remote="gcs-remote",
             rev="v1.0"
