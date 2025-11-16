@@ -28,9 +28,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # -------------------------------------------------------
-      # BUILD MUST USE JSON AUTH (WIF cannot push to GAR)
-      # -------------------------------------------------------
+      # Build must use JSON key auth
       - name: Decode and activate GCP service account
         run: |
           echo "${{ secrets.GCP_SA_KEY_B64 }}" | base64 --decode > sa.json
@@ -42,7 +40,7 @@ jobs:
           gcloud auth configure-docker ${{ env.GAR_LOCATION }}-docker.pkg.dev
 
       - name: Build and push Docker image
-        id: docker_push
+        id: docker_build
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -55,8 +53,12 @@ jobs:
         id: export_image
         run: |
           IMAGE_URL="${{ env.GAR_LOCATION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/iris-api-repo/${{ env.IMAGE_NAME }}:${{ github.sha }}"
-          echo "Built image URL: $IMAGE_URL"
           echo "image_url=$IMAGE_URL" >> $GITHUB_OUTPUT
+          echo "Built image: $IMAGE_URL"
+
+      - name: Debug build job output
+        run: |
+          echo "Step output inside build job: '${{ steps.export_image.outputs.image_url }}'"
 
   deploy-to-gke:
     runs-on: ubuntu-latest
@@ -66,9 +68,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # -------------------------------------------------------
-      # DEPLOY CAN USE WIF (correct for GKE)
-      # -------------------------------------------------------
+      # Deploy can use WIF
       - name: Authenticate to Google Cloud (WIF)
         uses: google-github-actions/auth@v2
         with:
@@ -82,35 +82,28 @@ jobs:
           location: ${{ env.GKE_ZONE }}
           project_id: ${{ env.GCP_PROJECT_ID }}
 
-      - name: Debug image URL
+      - name: Debug received output
         run: |
           echo "Received image URL: '${{ needs.build-and-push.outputs.image_url }}'"
-          if [ -z "${{ needs.build-and-push.outputs.image_url }}" ]; then
-            echo "ERROR: No image_url received from build job."
-            exit 1
-          fi
 
-      # -------------------------------------------------------
-      # Render IN-PLACE (recommended fix)
-      # -------------------------------------------------------
-      - name: Render Kubernetes manifest in-place
+      # Render manifest in place
+      - name: Render Kubernetes deployment
         run: |
           IMAGE_TO_DEPLOY="${{ needs.build-and-push.outputs.image_url }}"
           echo "Rendering with image: $IMAGE_TO_DEPLOY"
 
-          # Replace placeholders directly in deployment.yaml
-          sed -i "s|__IMAGE_PLACEHOLDER__|$IMAGE_TO_DEPLOY|g" k8s/deployment.yaml
-          sed -i "s|__MLFLOW_URI_PLACEHOLDER__|${{ env.MLFLOW_URI_FROM_SECRET }}|g" k8s/deployment.yaml
-
-          echo "------- Rendered deployment.yaml -------"
-          cat k8s/deployment.yaml
-
-          if ! grep -q "$IMAGE_TO_DEPLOY" k8s/deployment.yaml; then
-            echo "ERROR: Image not inserted."
+          if [ -z "$IMAGE_TO_DEPLOY" ]; then
+            echo "ERROR: Empty image URL from build job"
             exit 1
           fi
 
-      - name: Apply Kubernetes manifests
+          sed -i "s|__IMAGE_PLACEHOLDER__|$IMAGE_TO_DEPLOY|g" k8s/deployment.yaml
+          sed -i "s|__MLFLOW_URI_PLACEHOLDER__|${{ env.MLFLOW_URI_FROM_SECRET }}|g" k8s/deployment.yaml
+
+          echo "Rendered deployment.yaml:"
+          cat k8s/deployment.yaml
+
+      - name: Apply manifests
         run: |
           kubectl apply -f k8s/deployment.yaml
           kubectl apply -f k8s/service.yaml
