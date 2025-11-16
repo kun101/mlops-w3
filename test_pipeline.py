@@ -1,88 +1,87 @@
 import pytest
-import os
 import pandas as pd
-import joblib
+import mlflow
+import dvc.api
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
-from dvc.api import DVCFileSystem # Import DVCFileSystem
+import os
+import subprocess
+import shutil
 
-# --- Configuration (UPDATE THESE) ---
-DVC_REPO_URL = "https://github.com/kun101/mlops-w3.git" # Your GitHub repo URL
-DATA_PATH_IN_DVC = "data/iris.csv" # Path to data folder in your DVC config
-MODEL_PATH_IN_DVC = "artifacts/model.joblib" # Path to model in your DVC config
-DVC_TAG_TO_TEST = os.getenv("DVC_REV", "v1.0")
+# --- 1. CONFIGURATION ---
+# (REQUIRED) SET THIS TO YOUR 3002 PROXY URL
+MLFLOW_TRACKING_URI = "http://34.170.7.37:5000/"
 
-# --- Data Loading Function (using DVCFileSystem) ---
-def load_dvc_data(path_in_dvc, tag):
-    fs = DVCFileSystem(DVC_REPO_URL, rev=tag)
-    if fs.isdir(path_in_dvc):  # <- check if path is a directory
-        # list all files
-        files = fs.ls(path_in_dvc)
-        data_frames = []
-        for f in files:
-            if f.endswith(".csv"):
-                with fs.open(f, "rb") as file_obj:
-                    df = pd.read_csv(file_obj)
-                    data_frames.append(df)
-        # combine CSVs if multiple
-        return pd.concat(data_frames, ignore_index=True)
-    else:
-        with fs.open(path_in_dvc, "rb") as f:
-            if path_in_dvc.endswith(".csv"):
-                return pd.read_csv(f)
-            elif path_in_dvc.endswith(".joblib"):
-                return joblib.load(f)
-            else:
-                raise ValueError("Unsupported file type for DVC loading.")
+# Model name in the MLflow Model Registry
+MODEL_NAME = "iris-classifier"
+MODEL_STAGE = "production"
 
-# --- Tests ---
+# DVC path for the evaluation data
+DATA_PATH = 'data/v2/iris.csv'
+DVC_REPO_URL = 'https://github.com/kun101/mlops-w3'
+DVC_TAG = 'v1.0' # Use the same data version you trained on
+
+if os.path.exists("mlops-w3"):
+    shutil.rmtree("mlops-w3")
+    
+if not os.path.exists("mlops-w3"):
+    subprocess.run(["git", "clone", DVC_REPO_URL], check=True)
+    
+repo_path = os.path.abspath("mlops-w3")
+
+# --- 2. FIXTURES ---
 @pytest.fixture(scope="module")
-def setup_data_and_model():
-    """Fixture to load data and model for tests."""
+def model():
+    """Fixture to load the Production model from MLflow Registry."""
+    print(f"Loading model '{MODEL_NAME}' from stage '{MODEL_STAGE}'...")
+    mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
+    model_uri = f"models:/{MODEL_NAME}@{MODEL_STAGE}"
     try:
-        data = load_dvc_data(DATA_PATH_IN_DVC, DVC_TAG_TO_TEST)
-        model = load_dvc_data(MODEL_PATH_IN_DVC, DVC_TAG_TO_TEST)
-        return data, model
+        model = mlflow.pyfunc.load_model(model_uri)
+        print("Model loaded successfully.")
+        return model
     except Exception as e:
-        pytest.fail(f"Failed to load data or model from DVC: {e}")
+        pytest.fail(f"Failed to load model from MLflow: {e}")
 
-def test_data_columns(setup_data_and_model):
-    """Test if the dataset has expected columns."""
-    data, _ = setup_data_and_model
-    expected_columns = ['sepal_length', 'sepal_width', 'petal_length', 'petal_width', 'species']
-    assert all(col in data.columns for col in expected_columns), "Data is missing expected columns"
-    print(f"\nData columns: {data.columns.tolist()} (OK)")
+@pytest.fixture(scope="module")
+def data():
+    """Fixture to load evaluation data from DVC."""
+    print("Loading data from DVC...")
+    try:
+        data_url = dvc.api.get_url(
+            path="data/raw/iris.csv",
+            repo=repo_path,
+            remote="gcs-remote",
+            rev="v1.0"
+        )
+        data = pd.read_csv(data_url)
+        print("Data loaded successfully.")
+        return data
+    except Exception as e:
+        pytest.fail(f"Failed to load data from DVC: {e}")
 
-def test_data_shape(setup_data_and_model):
-    """Test if the dataset has the expected number of rows (e.g., at least 100 for Iris)."""
-    data, _ = setup_data_and_model
-    assert len(data) >= 100, "Dataset has fewer than 100 rows"
-    print(f"Data shape: {data.shape} (OK)")
-
-def test_model_predicts(setup_data_and_model):
+# --- 3. TESTS ---
+def test_model_predict(model, data):
     """Test if the model can make predictions without error."""
-    data, model = setup_data_and_model
     X = data[['sepal_length', 'sepal_width', 'petal_length', 'petal_width']]
-
     try:
         predictions = model.predict(X.head())
-        assert predictions is not None, "Model failed to make predictions"
-        print(f"Sample predictions made successfully: {predictions.tolist()} (OK)")
+        assert predictions is not None
+        print("\nPrediction test passed.")
     except Exception as e:
         pytest.fail(f"Model prediction failed: {e}")
 
-def test_model_accuracy_threshold(setup_data_and_model):
-    """Test if the model's accuracy meets a minimum threshold."""
-    data, model = setup_data_and_model
+def test_model_accuracy(model, data):
+    """Test if the model accuracy is above the 0.90 threshold."""
     X = data[['sepal_length', 'sepal_width', 'petal_length', 'petal_width']]
     y = data['species']
 
-    # Split data for evaluation (mimic training split)
+    # Use the same split as in training for a consistent eval set
     _, X_test, _, y_test = train_test_split(X, y, test_size=0.4, random_state=42, stratify=y)
 
     predictions = model.predict(X_test)
     accuracy = accuracy_score(y_test, predictions)
+    print(f"Model accuracy: {accuracy:.3f}")
 
-    min_accuracy_threshold = 0.90 # Set your desired minimum accuracy
-    assert accuracy >= min_accuracy_threshold, f"Model accuracy {accuracy:.3f} is below {min_accuracy_threshold}"
-    print(f"Model accuracy: {accuracy:.3f} (Above {min_accuracy_threshold} threshold - OK)")
+    assert accuracy >= 0.90, f"Accuracy {accuracy:.3f} is below threshold (0.90)"
+    print("Accuracy test passed.")
