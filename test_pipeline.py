@@ -8,7 +8,7 @@ import os
 import subprocess
 import shutil
 
-# --- 1. CONFIGURATION ---
+# --- 1. CONFIGURATION --
 # (REQUIRED) SET THIS TO YOUR 3002 PROXY URL
 MLFLOW_TRACKING_URI = "http://34.170.7.37:5000/"
 
